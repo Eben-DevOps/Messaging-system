@@ -37,7 +37,7 @@ else
 fi
 
 echo "Starting ngrok to expose the application..."
-nohup /usr/local/bin/ngrok http 5000 --config=/home/eben/.config/ngrok/ngrok.yml > ngrok.log 2>&1 &
+nohup ngrok http 5000 --config=$HOME/.config/ngrok/ngrok.yml > ngrok.log 2>&1 &
 sleep 5
 
 NGROK_TUNNELS_URL=$(curl --silent http://localhost:4040/api/tunnels)
