@@ -4,8 +4,11 @@ echo "Stopping any previous instances of the application, Celery workers, and ng
 pkill -f 'flask run'
 pkill -f 'celery -A celery_tasks worker'
 
+# Determine home directory
+HOME_DIR=$(eval echo "~$(whoami)")
+
 # Stop ngrok if running
-NGROK_PID=$(pgrep -f 'ngrok start --all --config=/home/eben/.config/ngrok/ngrok.yml')
+NGROK_PID=$(pgrep -f 'ngrok http 5000 --config='$HOME_DIR'/.config/ngrok/ngrok.yml')
 if [ -n "$NGROK_PID" ]; then
     kill $NGROK_PID
     echo "Stopped ngrok with PID $NGROK_PID"
