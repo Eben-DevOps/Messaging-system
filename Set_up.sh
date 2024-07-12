@@ -6,43 +6,56 @@ exec 2>&1
 
 echo "Updating package list and installing dependencies..."
 sudo apt-get update
-sudo apt-get install -y rabbitmq-server python3 python3-pip python3-venv nginx
-
-echo "Creating a virtual environment..."
-python3 -m venv venv
-source venv/bin/activate
+sudo apt-get install -y rabbitmq-server python3 python3-pip nginx
 
 echo "Installing necessary Python packages..."
-pip install Flask celery python-dotenv pytest
+pip3 install Flask celery python-dotenv pytest
 
 echo "Creating project directory..."
 mkdir -p messaging_system/logs
 cd messaging_system
 
-echo "Creating .env file..."
-cat <<EOT >> .env
+# Check if .env file exists before creating
+if [ ! -f .env ]; then
+    echo "Creating .env file..."
+    cat <<EOT >> .env
 EMAIL_HOST=smtp.office365.com
 EMAIL_PORT=587
 EMAIL_USER=your_office365_email@example.com
 EMAIL_PASSWORD=your_office365_password
 EOT
+else
+    echo ".env file already exists. Skipping creation."
+fi
 
-echo "Creating requirements.txt..."
-cat <<EOT >> requirements.txt
-Flask==2.0.3
-celery==5.2.3
-python-dotenv==0.19.2
-pytest==6.2.4
+# Check if requirements.txt exists before creating
+if [ ! -f requirements.txt ]; then
+    echo "Creating requirements.txt..."
+    cat <<EOT >> requirements.txt
+Flask==3.0.3
+celery==5.4.0
+python-dotenv==1.0.1
+pytest==8.2.2
 EOT
+else
+    echo "requirements.txt already exists. Skipping creation."
+fi
 
-echo "Creating celeryconfig.py..."
-cat <<EOT >> celeryconfig.py
+# Check if celeryconfig.py exists before creating
+if [ ! -f celeryconfig.py ]; then
+    echo "Creating celeryconfig.py..."
+    cat <<EOT >> celeryconfig.py
 broker_url = 'pyamqp://guest@localhost//'
 result_backend = 'rpc://'
 EOT
+else
+    echo "celeryconfig.py already exists. Skipping creation."
+fi
 
-echo "Creating celery_tasks.py..."
-cat <<EOT >> celery_tasks.py
+# Check if celery_tasks.py exists before creating
+if [ ! -f celery_tasks.py ]; then
+    echo "Creating celery_tasks.py..."
+    cat <<EOT >> celery_tasks.py
 from celery import Celery
 from smtplib import SMTP
 import os
@@ -66,50 +79,12 @@ def send_email(recipient: str) -> None:
         message = f"Subject: Test Email\n\nThis is a test email to {recipient}"
         server.sendmail(sender_email, recipient, message)
 EOT
-
-echo "Creating app.py..."
-cat <<EOT >> app.py
-from flask import Flask, request, jsonify
-from celery_tasks import send_email
-import logging
-import time
-import os
-
-app = Flask(__name__)
-
-log_file_path = os.path.join(os.getcwd(), 'logs', 'messaging_system.log')
-logging.basicConfig(filename=log_file_path, level=logging.INFO)
-
-@app.route('/')
-def index() -> str:
-    sendmail = request.args.get('sendmail')
-    talktome = request.args.get('talktome')
-    
-    if sendmail:
-        send_email.delay(sendmail)
-        return f"Email to {sendmail} is queued."
-    
-    if talktome:
-        current_time = time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime())
-        logging.info(f'Current time logged: {current_time}')
-        return f'Current time {current_time} is logged.'
-    
-    return 'Please provide a valid parameter.'
-
-@app.route('/logs', methods=['GET'])
-def get_logs() -> jsonify:
-    with open(log_file_path, 'r') as log_file:
-        logs = log_file.readlines()
-    return jsonify(logs)
-
-if __name__ == '__main__':
-    if not os.path.exists('logs'):
-        os.makedirs('logs')
-    app.run(debug=True)
-EOT
+else
+    echo "celery_tasks.py already exists. Skipping creation."
+fi
 
 echo "Creating Nginx configuration file..."
-sudo bash -c 'cat <<EOT > /etc/nginx/sites-available/default
+cat <<EOT | sudo tee /etc/nginx/sites-available/default >/dev/null
 server {
     listen 80;
     server_name localhost;
@@ -122,7 +97,10 @@ server {
         proxy_set_header X-Forwarded-Proto \$scheme;
     }
 }
-EOT'
+EOT
+
+echo "Symlinking Nginx configuration..."
+sudo ln -sf /etc/nginx/sites-available/default /etc/nginx/sites-enabled/
 
 echo "Restarting Nginx service..."
 sudo systemctl restart nginx
@@ -130,11 +108,18 @@ sudo systemctl restart nginx
 echo "Starting RabbitMQ server..."
 sudo systemctl start rabbitmq-server
 
+echo "Stopping any existing Celery workers..."
+pkill -f 'celery -A celery_tasks worker'
+
 echo "Starting Celery worker..."
-nohup ./venv/bin/celery -A celery_tasks worker --loglevel=info &
+nohup celery -A celery_tasks worker --loglevel=info &
 
 echo "Starting Flask application..."
-nohup ./venv/bin/python app.py &
+nohup python3 -u -m flask run --host=127.0.0.1 --port=5000 > flask.log 2>&1 &
+
+# Start ngrok to expose port 5000 via HTTP
+echo "Starting ngrok to expose port 5000..."
+nohup /usr/local/bin/ngrok http 5000 > ngrok.log 2>&1 &
 
 echo "Setup complete. You can now access the application."
 echo "Use the following commands to test the endpoints:"
