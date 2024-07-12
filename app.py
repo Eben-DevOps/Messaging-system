@@ -6,7 +6,15 @@ import os
 
 app = Flask(__name__)
 
-log_file_path = os.path.join(os.getcwd(), 'logs', 'messaging_system.log')
+# Ensure /var/log directory exists
+log_dir = '/var/log'
+if not os.path.exists(log_dir):
+    os.makedirs(log_dir)
+
+# Set log file path
+log_file_path = os.path.join(log_dir, 'messaging_system.log')
+
+# Configure logging to write to the specified log file
 logging.basicConfig(filename=log_file_path, level=logging.INFO)
 
 @app.route('/')
