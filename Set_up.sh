@@ -6,10 +6,14 @@ exec 2>&1
 
 echo "Updating package list and installing dependencies..."
 sudo apt-get update
-sudo apt-get install -y rabbitmq-server python3 python3-pip nginx
+sudo apt-get install -y rabbitmq-server python3 python3-pip python3-venv nginx
+
+echo "Creating a virtual environment..."
+python3 -m venv venv
+source venv/bin/activate
 
 echo "Installing necessary Python packages..."
-pip3 install Flask celery python-dotenv pytest
+pip install Flask celery python-dotenv pytest
 
 echo "Creating project directory..."
 mkdir -p messaging_system/logs
@@ -127,10 +131,10 @@ echo "Starting RabbitMQ server..."
 sudo systemctl start rabbitmq-server
 
 echo "Starting Celery worker..."
-nohup celery -A celery_tasks worker --loglevel=info &
+nohup ./venv/bin/celery -A celery_tasks worker --loglevel=info &
 
 echo "Starting Flask application..."
-nohup python3 app.py &
+nohup ./venv/bin/python app.py &
 
 echo "Setup complete. You can now access the application."
 echo "Use the following commands to test the endpoints:"
