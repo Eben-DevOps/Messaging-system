@@ -4,6 +4,9 @@ LOGFILE="start.log"
 exec > >(tee -i $LOGFILE)
 exec 2>&1
 
+# Add local bin to PATH
+export PATH=$PATH:~/.local/bin
+
 echo "Stopping any previous instances of the application, Celery workers, and ngrok..."
 pkill -f 'flask run'
 pkill -f 'celery -A celery_tasks worker'
@@ -37,7 +40,11 @@ else
 fi
 
 echo "Starting ngrok to expose the application..."
-nohup ngrok http 5000 --config=$HOME/.config/ngrok/ngrok.yml > ngrok.log 2>&1 &
+# Determine the home directory dynamically
+HOME_DIR=$(eval echo ~$USER)
+NGROK_CONFIG_PATH="$HOME_DIR/.config/ngrok/ngrok.yml"
+
+nohup /usr/local/bin/ngrok http 5000 --config="$NGROK_CONFIG_PATH" > ngrok.log 2>&1 &
 sleep 5
 
 NGROK_TUNNELS_URL=$(curl --silent http://localhost:4040/api/tunnels)
