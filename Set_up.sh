@@ -28,9 +28,23 @@ fi
 echo "Installing nginx..."
 sudo apt-get install -y nginx
 
-# Restart Nginx service
-echo "Restarting Nginx service..."
-sudo systemctl restart nginx
+# Install ngrok if not already installed or update to the latest version
+NGROK_DOWNLOAD_URL="https://bin.equinox.io/c/4VmDzA7iaHb/ngrok-stable-linux-amd64.zip"
+NGROK_INSTALL_DIR="/usr/local/bin"
+
+if ! command -v ngrok &> /dev/null; then
+    echo "Ngrok not found. Installing..."
+    sudo wget -q -O /tmp/ngrok.zip $NGROK_DOWNLOAD_URL
+    sudo unzip -o /tmp/ngrok.zip -d $NGROK_INSTALL_DIR
+    sudo chmod +x $NGROK_INSTALL_DIR/ngrok
+    rm /tmp/ngrok.zip
+else
+    echo "Ngrok already installed. Updating to the latest version..."
+    sudo wget -q -O /tmp/ngrok.zip $NGROK_DOWNLOAD_URL
+    sudo unzip -o /tmp/ngrok.zip -d $NGROK_INSTALL_DIR
+    sudo chmod +x $NGROK_INSTALL_DIR/ngrok
+    rm /tmp/ngrok.zip
+fi
 
 # Set up ngrok with authentication token
 echo "Setting up ngrok..."
@@ -48,27 +62,15 @@ fi
 HOME_DIR=$(eval echo ~$USER)
 NGROK_CONFIG_PATH="$HOME_DIR/.config/ngrok/ngrok.yml"
 
-# Install ngrok if not already installed or update to the latest version
-if ! command -v ngrok &> /dev/null; then
-    echo "Ngrok not found. Installing..."
-    wget -q -O ngrok.zip https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-linux-amd64.zip
-    unzip ngrok.zip
-    sudo mv ngrok /usr/local/bin/ngrok
-    rm ngrok.zip
-else
-    echo "Updating ngrok to the latest version..."
-    wget -q -O ngrok.zip https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-linux-amd64.zip
-    unzip ngrok.zip
-    sudo mv ngrok /usr/local/bin/ngrok
-    rm ngrok.zip
-fi
-
 # Add ngrok authentication token to ngrok.yml
 mkdir -p "$(dirname "$NGROK_CONFIG_PATH")"
-echo "version: '2'
-authtoken: $NGROK_AUTH_TOKEN" > "$NGROK_CONFIG_PATH"
+echo "authtoken: $NGROK_AUTH_TOKEN
+tunnels:
+  flask-app:
+    proto: http
+    addr: 5000" > "$NGROK_CONFIG_PATH"
 
-# Ensure log directory exists
+# Ensure log directory exists and set permissions
 sudo mkdir -p /var/log/messaging_system
 sudo touch /var/log/messaging_system/messaging_system.log
 sudo chown $USER:$USER /var/log/messaging_system/messaging_system.log
