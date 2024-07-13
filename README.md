@@ -68,7 +68,6 @@ Install ngrok
 sudo wget https://bin.equinox.io/c/4VmDzA7iaHb/ngrok-stable-linux-amd64.zip -O /tmp/ngrok.zip
 sudo unzip -o /tmp/ngrok.zip -d /usr/local/bin/
 sudo chmod +x /usr/local/bin/ngrok
-Restart Nginx service
 ```
 
 ```sh
