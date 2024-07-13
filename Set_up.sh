@@ -22,6 +22,12 @@ fi
 # Install nginx
 sudo apt-get install -y nginx
 
+# Install ngrok
+echo "Installing Ngrok..."
+sudo wget https://bin.equinox.io/c/4VmDzA7iaHb/ngrok-stable-linux-amd64.zip -O /tmp/ngrok.zip
+sudo unzip -o /tmp/ngrok.zip -d /usr/local/bin/
+sudo chmod +x /usr/local/bin/ngrok
+
 # Restart Nginx service
 sudo systemctl restart nginx
 
@@ -36,7 +42,7 @@ fi
 
 # Adjust ngrok config path based on home directory
 HOME_DIR=$(eval echo "~$(whoami)")
-NGROK_CONFIG_PATH="$HOME_DIR/.config/ngrok/ngrok.yml"
+NGROK_CONFIG_PATH="$HOME_DIR/.ngrok2/ngrok.yml"
 
 # Create ngrok config directory if it doesn't exist
 mkdir -p $(dirname $NGROK_CONFIG_PATH)
