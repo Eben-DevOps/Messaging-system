@@ -5,11 +5,16 @@ exec > >(tee -i $LOGFILE)
 exec 2>&1
 
 # Update package list and install dependencies
+echo "Updating package list and installing dependencies..."
 sudo apt-get update
-sudo apt-get install -y rabbitmq-server python3 python3-pip
+sudo apt-get install -y rabbitmq-server python3 python3-pip unzip nginx jq
 
-# Install necessary Python packages
-pip3 install --upgrade flask werkzeug celery python-dotenv pytest
+# Add local bin to PATH
+export PATH=$PATH:~/.local/bin
+
+# Install necessary Python packages with specific versions
+echo "Installing necessary Python packages..."
+pip3 install --upgrade flask==2.0.3 werkzeug==2.0.3 celery python-dotenv pytest
 
 # Check if requirements.txt exists and install additional Python packages
 if [ -f requirements.txt ]; then
@@ -20,18 +25,31 @@ else
 fi
 
 # Install nginx
+echo "Installing nginx..."
 sudo apt-get install -y nginx
 
-# Install ngrok
-echo "Installing Ngrok..."
-sudo wget https://bin.equinox.io/c/4VmDzA7iaHb/ngrok-stable-linux-amd64.zip -O /tmp/ngrok.zip
-sudo unzip -o /tmp/ngrok.zip -d /usr/local/bin/
-sudo chmod +x /usr/local/bin/ngrok
+# Install ngrok if not already installed or update to the latest version
+NGROK_DOWNLOAD_URL="https://bin.equinox.io/c/4VmDzA7iaHb/ngrok-stable-linux-amd64.zip"
+NGROK_INSTALL_DIR="/usr/local/bin"
 
-# Restart Nginx service
-sudo systemctl restart nginx
+if ! command -v ngrok &> /dev/null; then
+    echo "Ngrok not found. Installing..."
+    sudo wget -q -O /tmp/ngrok.zip $NGROK_DOWNLOAD_URL
+    sudo unzip -o /tmp/ngrok.zip -d $NGROK_INSTALL_DIR
+    sudo chmod +x $NGROK_INSTALL_DIR/ngrok
+    rm /tmp/ngrok.zip
+else
+    echo "Ngrok already installed. Updating to the latest version..."
+    sudo wget -q -O /tmp/ngrok.zip $NGROK_DOWNLOAD_URL
+    sudo unzip -o /tmp/ngrok.zip -d $NGROK_INSTALL_DIR
+    sudo chmod +x $NGROK_INSTALL_DIR/ngrok
+    rm /tmp/ngrok.zip
+fi
 
 # Set up ngrok with authentication token
+echo "Setting up ngrok..."
+
+# Read ngrok auth token from .env file
 if [ -f .env ]; then
     export $(grep -v '^#' .env | xargs)
     NGROK_AUTH_TOKEN=$NGROK_AUTH_TOKEN
@@ -40,19 +58,21 @@ else
     exit 1
 fi
 
-# Adjust ngrok config path based on home directory
-HOME_DIR=$(eval echo "~$(whoami)")
-NGROK_CONFIG_PATH="$HOME_DIR/.ngrok2/ngrok.yml"
+# Determine the home directory dynamically
+HOME_DIR=$(eval echo ~$USER)
+NGROK_CONFIG_PATH="$HOME_DIR/.config/ngrok/ngrok.yml"
 
-# Create ngrok config directory if it doesn't exist
-mkdir -p $(dirname $NGROK_CONFIG_PATH)
+# Add ngrok authentication token to ngrok.yml
+mkdir -p "$(dirname "$NGROK_CONFIG_PATH")"
+echo "authtoken: $NGROK_AUTH_TOKEN
+tunnels:
+  flask-app:
+    proto: http
+    addr: 5000" > "$NGROK_CONFIG_PATH"
 
-# Write ngrok configuration to ngrok.yml
-echo "authtoken: $NGROK_AUTH_TOKEN" > $NGROK_CONFIG_PATH
-echo "tunnels:" >> $NGROK_CONFIG_PATH
-echo "  flask-app:" >> $NGROK_CONFIG_PATH
-echo "    proto: http" >> $NGROK_CONFIG_PATH  # Protocol used by your application
-echo "    addr: 5000" >> $NGROK_CONFIG_PATH   # Port on which your application runs
-echo "version: 2" >> $NGROK_CONFIG_PATH       # Ngrok configuration version
+# Ensure log directory exists and set permissions
+sudo mkdir -p /var/log/messaging_system
+sudo touch /var/log/messaging_system/messaging_system.log
+sudo chown $USER:$USER /var/log/messaging_system/messaging_system.log
 
 echo "Setup complete."

@@ -14,8 +14,8 @@ if not os.path.exists(log_dir):
 # Set log file path
 log_file_path = os.path.join(log_dir, 'messaging_system.log')
 
-# Configure logging to write to the specified log file
-logging.basicConfig(filename=log_file_path, level=logging.INFO)
+# Configure logging with format
+logging.basicConfig(filename=log_file_path, level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 @app.route('/')
 def index() -> str:
@@ -25,24 +25,26 @@ def index() -> str:
     
     if sendmail:
         send_email.delay(sendmail, email_body)
-        print(f"Email to {sendmail} is queued.")
+        logging.info(f"Email to {sendmail} is queued.")
         return f"Email to {sendmail} is queued."
     
-    if talktome:
+    if talktome is not None:  # Check if talktome parameter is present
         current_time = time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime())
         logging.info(f'Current time logged: {current_time}')
-        print(f'Current time {current_time} is logged.')
         return f'Current time {current_time} is logged.'
     
     return 'Please provide a valid parameter.'
 
 @app.route('/logs', methods=['GET'])
 def get_logs() -> jsonify:
-    with open(log_file_path, 'r') as log_file:
-        logs = log_file.readlines()
-    return jsonify(logs)
+    try:
+        with open(log_file_path, 'r') as log_file:
+            logs = log_file.readlines()
+        return jsonify(logs)
+    except FileNotFoundError:
+        return jsonify({'error': 'Log file not found'}), 404
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
-    if not os.path.exists('logs'):
-        os.makedirs('logs')
     app.run(debug=True)
